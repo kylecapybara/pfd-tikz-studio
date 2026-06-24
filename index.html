@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PFD TikZ Studio</title>
+    <link rel="stylesheet" href="styles.css?v=20260621-9">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">PFD</span>
+          <span>TikZ Studio</span>
+        </div>
+        <div class="tool-strip" role="toolbar" aria-label="Editor tools">
+          <button class="tool active" data-tool="select" title="Select (V)">↖</button>
+          <button class="tool" data-tool="pan" title="Pan (H)">✥</button>
+          <button class="tool" data-tool="line" title="Line (L)">╱</button>
+          <button class="tool" data-tool="pipe" title="Orthogonal pipe (P)">┐</button>
+          <button class="tool" data-tool="arrow" title="Arrow stream (A)">→</button>
+          <button class="tool" data-tool="bidi" title="Bidirectional stream (B)">↔</button>
+          <button class="tool" data-tool="text" title="Text label (T)">T</button>
+        </div>
+        <div class="action-strip">
+          <button id="undoBtn" title="Undo (Ctrl/Cmd+Z)">↶</button>
+          <button id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+          <button id="copyBtn" title="Copy TikZ">Copy TikZ</button>
+          <button id="downloadTexBtn" title="Download .tex">.tex</button>
+          <button id="saveJsonBtn" title="Save JSON">JSON</button>
+          <label class="file-button" title="Load JSON">
+            Load
+            <input id="loadJsonInput" type="file" accept="application/json,.json">
+          </label>
+        </div>
+      </header>
+
+      <aside class="palette panel">
+        <div class="panel-title">Equipment</div>
+        <button id="newCustomBlockBtn" class="wide-button">New Custom Block</button>
+        <div id="shapePalette" class="shape-grid"></div>
+        <div class="panel-title">Fast Tags</div>
+        <div class="tag-row">
+          <button data-tag-prefix="P">P-101</button>
+          <button data-tag-prefix="R">R-201</button>
+          <button data-tag-prefix="V">V-301</button>
+          <button data-tag-prefix="HX">HX-401</button>
+        </div>
+        <div class="panel-title">Layout</div>
+        <div class="compact-grid">
+          <button id="alignLeftBtn">Left</button>
+          <button id="alignCenterBtn">Center</button>
+          <button id="alignTopBtn">Top</button>
+          <button id="alignMiddleBtn">Middle</button>
+          <button id="distHBtn">Dist H</button>
+          <button id="distVBtn">Dist V</button>
+        </div>
+      </aside>
+
+      <main class="canvas-wrap">
+        <svg id="canvas" tabindex="0" aria-label="PFD drawing canvas">
+          <defs>
+            <pattern id="gridPattern" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#d8e3ea" stroke-width="1"></path>
+            </pattern>
+            <marker id="arrowEnd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path>
+            </marker>
+            <marker id="arrowStart" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 10 0 L 0 5 L 10 10 z" fill="context-stroke"></path>
+            </marker>
+          </defs>
+          <rect id="gridRect" x="-5000" y="-5000" width="10000" height="10000" fill="url(#gridPattern)"></rect>
+          <g id="viewport">
+            <g id="sceneLayer"></g>
+            <g id="overlayLayer"></g>
+          </g>
+        </svg>
+        <div class="statusbar">
+          <span id="toolStatus">Select</span>
+          <span id="coordStatus">0, 0</span>
+          <span id="zoomStatus">100%</span>
+        </div>
+      </main>
+
+      <aside class="inspector panel">
+        <div class="panel-title">Properties</div>
+        <div id="emptyInspector" class="empty-state">Select an object to edit its tag, geometry, style, and TikZ options.</div>
+        <form id="propertyForm" class="property-form hidden">
+          <label>Label <input id="propText" name="text" type="text"></label>
+          <div class="two-cols">
+            <label>X <input id="propX" name="x" type="number" step="1"></label>
+            <label>Y <input id="propY" name="y" type="number" step="1"></label>
+            <label>W <input id="propW" name="width" type="number" step="1"></label>
+            <label>H <input id="propH" name="height" type="number" step="1"></label>
+            <label>Rot <input id="propRot" name="rotation" type="number" step="15"></label>
+            <label>Stroke <input id="propStrokeWidth" name="strokeWidth" type="number" step="0.5" min="0.5"></label>
+          </div>
+          <label>Stroke <input id="propStroke" name="stroke" type="color"></label>
+          <label>Fill <input id="propFill" name="fill" type="color"></label>
+          <label>Pattern
+            <select id="propPattern" name="pattern">
+              <option value="none">None</option>
+              <option value="horizontal lines">Horizontal lines</option>
+              <option value="vertical lines">Vertical lines</option>
+              <option value="north east lines">North east lines</option>
+              <option value="north west lines">North west lines</option>
+              <option value="grid">Grid</option>
+              <option value="crosshatch">Crosshatch</option>
+            </select>
+          </label>
+          <label>Arrow
+            <select id="propArrow" name="arrow">
+              <option value="none">None</option>
+              <option value="->">Forward</option>
+              <option value="<-">Reverse</option>
+              <option value="<->">Both</option>
+            </select>
+          </label>
+          <div class="compact-grid">
+            <button id="rotateLeftBtn" type="button">Rotate -90</button>
+            <button id="rotateRightBtn" type="button">Rotate +90</button>
+            <button id="bringForwardBtn" type="button">Forward</button>
+            <button id="sendBackwardBtn" type="button">Backward</button>
+          </div>
+        </form>
+
+        <div class="panel-title">Canvas</div>
+        <div class="property-form">
+          <label>Grid spacing <input id="gridSpacing" type="number" min="5" step="5" value="20"></label>
+          <label>Pixels per TikZ unit <input id="scaleInput" type="number" min="5" step="5" value="40"></label>
+          <label class="check-row"><input id="snapToggle" type="checkbox" checked> Snap to grid</label>
+          <label class="check-row"><input id="gridToggle" type="checkbox" checked> Show grid</label>
+        </div>
+      </aside>
+
+      <section class="tikz-panel panel">
+        <div class="tikz-header">
+          <div>
+            <div class="panel-title">Live TikZ</div>
+            <span id="sceneStats"></span>
+          </div>
+          <button id="clearBtn">Clear</button>
+        </div>
+        <textarea id="tikzOutput" spellcheck="false"></textarea>
+      </section>
+    </div>
+
+    <dialog id="customBlockDialog" class="custom-dialog">
+      <form method="dialog" class="custom-dialog-inner">
+        <div class="dialog-header">
+          <div>
+            <div class="panel-title">Custom Block</div>
+            <input id="customBlockName" type="text" value="Custom Block" aria-label="Custom block name">
+          </div>
+          <button id="closeCustomBlockBtn" type="button" title="Close">×</button>
+        </div>
+        <div class="custom-toolbar" role="toolbar" aria-label="Custom block drawing tools">
+          <button type="button" data-custom-tool="line" class="active">Line</button>
+          <button type="button" data-custom-tool="rect">Rect</button>
+          <button type="button" data-custom-tool="circle">Circle</button>
+          <button type="button" id="undoCustomPrimitiveBtn">Undo</button>
+          <button type="button" id="clearCustomPrimitiveBtn">Clear</button>
+        </div>
+        <svg id="customBlockCanvas" viewBox="0 0 200 140" aria-label="Custom block drawing canvas">
+          <defs>
+            <pattern id="customGridPattern" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#e1eaee" stroke-width="0.8"></path>
+            </pattern>
+          </defs>
+          <rect width="200" height="140" fill="url(#customGridPattern)"></rect>
+          <g id="customBlockLayer"></g>
+        </svg>
+        <div class="dialog-actions">
+          <button type="button" id="saveCustomBlockBtn">Save Block</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js?v=20260621-9"></script>
+  </body>
+</html>
