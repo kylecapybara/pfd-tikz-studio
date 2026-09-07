@@ -351,6 +351,21 @@ button.active,
   gap: 12px;
 }
 
+.code-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+}
+
+.code-tab {
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 #sceneStats {
   color: var(--muted);
   font-size: 12px;

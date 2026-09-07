@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>PFD TikZ Studio</title>
+    <title>PFD Diagram Studio</title>
     <link rel="stylesheet" href="styles.css?v=20260621-9">
   </head>
   <body>
@@ -11,7 +11,7 @@
       <header class="topbar">
         <div class="brand">
           <span class="brand-mark">PFD</span>
-          <span>TikZ Studio</span>
+          <span>Diagram Studio</span>
         </div>
         <div class="tool-strip" role="toolbar" aria-label="Editor tools">
           <button class="tool active" data-tool="select" title="Select (V)">↖</button>
@@ -25,8 +25,8 @@
         <div class="action-strip">
           <button id="undoBtn" title="Undo (Ctrl/Cmd+Z)">↶</button>
           <button id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
-          <button id="copyBtn" title="Copy TikZ">Copy TikZ</button>
-          <button id="downloadTexBtn" title="Download .tex">.tex</button>
+          <button id="copyBtn" title="Copy current code">Copy TikZ</button>
+          <button id="downloadCodeBtn" title="Download current code">.tex</button>
           <button id="saveJsonBtn" title="Save JSON">JSON</button>
           <label class="file-button" title="Load JSON">
             Load
@@ -85,7 +85,7 @@
 
       <aside class="inspector panel">
         <div class="panel-title">Properties</div>
-        <div id="emptyInspector" class="empty-state">Select an object to edit its tag, geometry, style, and TikZ options.</div>
+        <div id="emptyInspector" class="empty-state">Select an object to edit its tag, geometry, style, and export options.</div>
         <form id="propertyForm" class="property-form hidden">
           <label>Label <input id="propText" name="text" type="text"></label>
           <div class="two-cols">
@@ -137,7 +137,10 @@
       <section class="tikz-panel panel">
         <div class="tikz-header">
           <div>
-            <div class="panel-title">Live TikZ</div>
+            <div class="code-tabs" role="tablist" aria-label="Generated code format">
+              <button id="tikzTab" class="code-tab active" data-code-mode="tikz" role="tab" aria-selected="true">TikZ</button>
+              <button id="matplotlibTab" class="code-tab" data-code-mode="matplotlib" role="tab" aria-selected="false">Matplotlib</button>
+            </div>
             <span id="sceneStats"></span>
           </div>
           <button id="clearBtn">Clear</button>
