@@ -1228,12 +1228,27 @@
 
   function matplotlibBounds(objects) {
     if (!objects.length) return { x: -120, y: -80, width: 1200, height: 760 };
-    const bounds = objects.map(boundsOf);
+    const bounds = objects.map(matplotlibBoundsOf);
     const minX = Math.min(...bounds.map((b) => b.x));
     const minY = Math.min(...bounds.map((b) => b.y));
     const maxX = Math.max(...bounds.map((b) => b.x + b.width));
     const maxY = Math.max(...bounds.map((b) => b.y + b.height));
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  function matplotlibBoundsOf(obj) {
+    const bounds = boundsOf(obj);
+    if (obj.kind !== "equipment" || !(obj.rotation % 360)) return bounds;
+    const center = objectCenter(obj);
+    const corners = [
+      { x: bounds.x, y: bounds.y },
+      { x: bounds.x + bounds.width, y: bounds.y },
+      { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+      { x: bounds.x, y: bounds.y + bounds.height }
+    ].map((point) => rotatePoint(point, center, obj.rotation));
+    const xs = corners.map((point) => point.x);
+    const ys = corners.map((point) => point.y);
+    return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
   }
 
   function matplotlibCustomPrimitives(obj) {
@@ -1249,9 +1264,10 @@
 
   function matplotlibEquipmentLine(obj) {
     const style = obj.style || DEFAULT_STYLE;
+    const kind = SHAPES[obj.type]?.custom ? "custom" : obj.type;
     const custom = SHAPES[obj.type]?.custom ? `, custom=${matplotlibCustomPrimitives(obj)}` : "";
     const hatch = matplotlibPattern(style.pattern);
-    return `draw_equipment(ax, kind=${pythonString(obj.type)}, x=${fmt(obj.x)}, y=${fmt(obj.y)}, width=${fmt(obj.width)}, height=${fmt(obj.height)}, rotation=${fmt(obj.rotation || 0)}, stroke=${pythonString(style.stroke || DEFAULT_STYLE.stroke)}, fill=${pythonString(style.fill || DEFAULT_STYLE.fill)}, linewidth=${fmt(Math.max((style.strokeWidth || DEFAULT_STYLE.strokeWidth) * 0.75, 0.5))}, hatch=${hatch ? pythonString(hatch) : "None"}, text=${pythonString(obj.text || "")}, text_color=${pythonString(style.textColor || DEFAULT_STYLE.textColor)}${custom})`;
+    return `draw_equipment(ax, kind=${pythonString(kind)}, x=${fmt(obj.x)}, y=${fmt(obj.y)}, width=${fmt(obj.width)}, height=${fmt(obj.height)}, rotation=${fmt(obj.rotation || 0)}, stroke=${pythonString(style.stroke || DEFAULT_STYLE.stroke)}, fill=${pythonString(style.fill || DEFAULT_STYLE.fill)}, linewidth=${fmt(Math.max((style.strokeWidth || DEFAULT_STYLE.strokeWidth) * 0.75, 0.5))}, hatch=${hatch ? pythonString(hatch) : "None"}, text=${pythonString(obj.text || "")}, text_color=${pythonString(style.textColor || DEFAULT_STYLE.textColor)}${custom})`;
   }
 
   function matplotlibStreamLine(obj) {
@@ -1286,13 +1302,17 @@
       "def xy(x, y):",
       "    return x / SCALE, -y / SCALE",
       "",
+      "def rect_xy(x, y, height):",
+      "    # Editor coordinates use a top-left origin; Matplotlib rectangles use a lower-left anchor.",
+      "    return x / SCALE, -(y + height) / SCALE",
+      "",
       "def patch_style(stroke, fill, linewidth, hatch=None):",
       "    return dict(edgecolor=stroke, facecolor=fill, linewidth=linewidth, hatch=hatch)",
       "",
       "def add_patch(ax, patch, center, rotation=0):",
       "    if rotation:",
       "        cx, cy = xy(*center)",
-      "        patch.set_transform(Affine2D().rotate_deg_around(cx, cy, rotation) + ax.transData)",
+      "        patch.set_transform(Affine2D().rotate_deg_around(cx, cy, -rotation) + ax.transData)",
       "    else:",
       "        patch.set_transform(ax.transData)",
       "    ax.add_patch(patch)",
@@ -1302,7 +1322,7 @@
       "    if not rotation:",
       "        return point",
       "    cx, cy = xy(*center)",
-      "    return tuple(Affine2D().rotate_deg_around(cx, cy, rotation).transform_point(point))",
+      "    return tuple(Affine2D().rotate_deg_around(cx, cy, -rotation).transform_point(point))",
       "",
       "def add_line(ax, points, color, linewidth, rotation=0, center=(0, 0)):",
       "    data_points = [rotated_xy(x, y, center, rotation) for x, y in points]",
@@ -1312,18 +1332,18 @@
       "def draw_stream(ax, points, color, linewidth, arrow='none', label=None, label_xy=None, text_color='#172126', rotation=0, center=(0, 0)):",
       "    data_points = [rotated_xy(x, y, center, rotation) for x, y in points]",
       "    ax.plot([p[0] for p in data_points], [p[1] for p in data_points], color=color, linewidth=linewidth, solid_capstyle='round', solid_joinstyle='round')",
-      "    arrowprops = dict(arrowstyle='-|>', color=color, lw=linewidth, shrinkA=0, shrinkB=0)",
+      "    arrowprops = dict(arrowstyle='-|>', color=color, lw=linewidth, mutation_scale=8 * linewidth, shrinkA=0, shrinkB=0)",
       "    if arrow in ('->', '<->') and len(data_points) > 1:",
       "        ax.annotate('', xy=data_points[-1], xytext=data_points[-2], arrowprops=arrowprops)",
       "    if arrow in ('<-', '<->') and len(data_points) > 1:",
       "        ax.annotate('', xy=data_points[0], xytext=data_points[1], arrowprops=arrowprops)",
       "    if label and label_xy is not None:",
       "        lx, ly = rotated_xy(label_xy[0], label_xy[1], center, rotation)",
-      "        ax.text(lx, ly + 8 / SCALE, label, ha='center', va='bottom', color=text_color, fontsize=10, bbox=dict(facecolor='white', edgecolor='none', pad=1))",
+      "        ax.text(lx, ly + 8 / SCALE, label, ha='center', va='baseline', color=text_color, fontsize=10, bbox=dict(facecolor='white', edgecolor='none', pad=1))",
       "",
       "def draw_label(ax, x, y, text, color, fontsize):",
       "    if text:",
-      "        ax.text(*xy(x, y), text, ha='center', va='center', color=color, fontsize=fontsize)",
+      "        ax.text(*xy(x, y), text, ha='center', va='baseline', color=color, fontsize=fontsize)",
       "",
       "def vessel_path(x, y, width, height, style):",
       "    top = y + height * 0.08",
@@ -1338,17 +1358,17 @@
       "    style = patch_style(stroke, fill, linewidth, hatch)",
       "    outline = patch_style(stroke, 'none', linewidth)",
       "    if kind == 'custom':",
-      "        add_patch(ax, Rectangle(xy(x, y), width / SCALE, height / SCALE, **style), center, rotation)",
+      "        add_patch(ax, Rectangle(rect_xy(x, y, height), width / SCALE, height / SCALE, **style), center, rotation)",
       "        for primitive, a, b in custom or []:",
       "            if primitive == 'line':",
       "                add_line(ax, [a, b], stroke, linewidth, rotation, center)",
       "            elif primitive == 'rect':",
       "                px = min(a[0], b[0]); py = min(a[1], b[1])",
-      "                add_patch(ax, Rectangle(xy(px, py), abs(b[0] - a[0]) / SCALE, abs(b[1] - a[1]) / SCALE, **outline), center, rotation)",
+      "                add_patch(ax, Rectangle(rect_xy(px, py, abs(b[1] - a[1])), abs(b[0] - a[0]) / SCALE, abs(b[1] - a[1]) / SCALE, **outline), center, rotation)",
       "            elif primitive == 'circle':",
       "                add_patch(ax, Ellipse(xy((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), abs(b[0] - a[0]) / SCALE, abs(b[1] - a[1]) / SCALE, **outline), center, rotation)",
       "    elif kind == 'rectangle':",
-      "        add_patch(ax, Rectangle(xy(x, y), width / SCALE, height / SCALE, **style), center, rotation)",
+      "        add_patch(ax, Rectangle(rect_xy(x, y, height), width / SCALE, height / SCALE, **style), center, rotation)",
       "    elif kind == 'circle':",
       "        add_patch(ax, Ellipse(xy(*center), width / SCALE, height / SCALE, **style), center, rotation)",
       "    elif kind == 'pump':",
@@ -1392,9 +1412,10 @@
       "        points = [(x, y + height * 0.18), (x + width, y), (x + width, y + height), (x, y + height * 0.82)]",
       "        add_patch(ax, Polygon([xy(*point) for point in points], closed=True, **style), center, rotation)",
       "    else:",
-      "        add_patch(ax, Rectangle(xy(x, y), width / SCALE, height / SCALE, **style), center, rotation)",
+      "        add_patch(ax, Rectangle(rect_xy(x, y, height), width / SCALE, height / SCALE, **style), center, rotation)",
       "    if text:",
-      "        ax.text(*xy(*center), text, ha='center', va='center', color=text_color, fontsize=10, rotation=rotation)",
+      "        text_x, text_y = rotated_xy(center[0], center[1] + 4, center, rotation)",
+      "        ax.text(text_x, text_y, text, ha='center', va='baseline', color=text_color, fontsize=10, rotation=-rotation)",
       "",
       "fig, ax = plt.subplots(figsize=(10, 6))",
       "ax.set_aspect('equal', adjustable='box')",
